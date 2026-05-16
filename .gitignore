@@ -1,0 +1,22 @@
+# Node
+node_modules/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+*.sqlite3
+db.sqlite3
+venv/
+.venv/
+
+# Environment
+.env
+backend/.env
+frontned/.env
+
+# VS Code
+.vscode/
+
+# Logs
+npm-debug.log*
