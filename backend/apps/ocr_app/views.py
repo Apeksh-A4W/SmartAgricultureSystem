@@ -3,6 +3,7 @@ import os
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 
 from django.conf import settings
 from django.core.files.storage import default_storage
@@ -13,6 +14,8 @@ from .serializers import SoilReportUploadSerializer
 
 
 class SoilOCRView(APIView):
+
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
 
@@ -42,7 +45,11 @@ class SoilOCRView(APIView):
 
                 "message": "OCR extraction successful",
 
-                "npk_values": npk_values,
+                "nitrogen": npk_values.get("nitrogen", 0),
+
+                "phosphorus": npk_values.get("phosphorus", 0),
+
+                "potassium": npk_values.get("potassium", 0),
 
                 "raw_text": extracted_text
             })

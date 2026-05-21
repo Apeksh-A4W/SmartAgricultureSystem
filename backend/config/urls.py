@@ -33,15 +33,20 @@ urlpatterns = [
     include('apps.predictions.urls')
 ),
     path(
-    'api/alerts/',
-    include('apps.alerts.urls')
-),
+        'api/alerts/',
+        include('apps.alerts.urls')
+    ),
     path(
-    'api/reports/',
-    include('apps.reports.urls')
-),
+        'api/reports/',
+        include('apps.reports.urls')
+    ),
     path(
-    'api/market/',
-    include('apps.recommendations.urls')
-),
+        'api/market/',
+        include('apps.recommendations.urls')
+    ),
+    path(
+        'api/recommendations/',
+        include('apps.recommendations.urls')
+    ),
+    
 ]

@@ -14,124 +14,136 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
-import { Home, TrendingUp, TrendingDown } from "lucide-react";
+import { Home, TrendingUp, TrendingDown, AlertCircle, RefreshCw } from "lucide-react";
 import { cropImages } from "@/lib/cropImages";
 
-const prices = [
-  { id: "rice", name: "Rice", price: 2100, change: 2.4 },
-  { id: "wheat", name: "Wheat", price: 1900, change: 1.1 },
-  { id: "maize", name: "Maize", price: 1750, change: -0.8 },
-  { id: "cotton", name: "Cotton", price: 6200, change: 3.5 },
-];
 
-
-const trend = [
-  { m: "Jan", p: 1850 },
-  { m: "Feb", p: 1900 },
-  { m: "Mar", p: 1950 },
-  { m: "Apr", p: 2000 },
-  { m: "May", p: 2080 },
-  { m: "Jun", p: 2100 },
-];
 
 const Market = () => {
-  const [marketData, setMarketData] =
-  useState<any[]>([]);
-
-const [loading, setLoading] =
-  useState(true);
+  const [marketData, setMarketData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const navigate = useNavigate();
   const { t } = useApp();
   const [filter, setFilter] = useState<string>("all");
 
-const visible =
-  filter === "all"
-    ? marketData
-    : marketData.filter(
-        (p) =>
-          p.crop?.toLowerCase() ===
-          filter
-      ); const top =
-  [...marketData].sort((a, b) => b.change - a.change)[0];
-useEffect(() => {
+  // Generate trend data for selected crop (or rice if none selected)
+  const selectedCrop = filter === "all" ? marketData[0] : marketData.find(p => p.crop?.toLowerCase() === filter);
+  const trendData = selectedCrop
+    ? Array.from({ length: 7 }, (_, i) => {
+        const basePrice = selectedCrop.price || 2000;
+        const variance = (selectedCrop.change || 0) * 10;
+        return {
+          day: `Day ${i + 1}`,
+          price: Math.round(basePrice - (variance * (6 - i) / 6) + Math.random() * 50),
+        };
+      })
+    : [];
 
-  const fetchMarketData = async () => {
+  const visible =
+    filter === "all"
+      ? marketData
+      : marketData.filter((p) => p.crop?.toLowerCase() === filter);
 
+  const top =
+    marketData.length > 0
+      ? [...marketData].sort((a, b) => (b.change || 0) - (a.change || 0))[0]
+      : null;
+
+  const fetchMarketData = async (showRefresh = false) => {
     try {
+      if (showRefresh) setRefreshing(true);
+      else setLoading(true);
+      setError(null);
 
-      setLoading(true);
+      const response = await apiFetch("/market/live-prices/");
 
-      const response =
-        await apiFetch(
-          "/market/live-prices/"
-        );
-
-      if (response.prices) {
-
-        setMarketData(
-          response.prices
-        );
-
-      } else if (
-        response.data?.records
-      ) {
-
-        const cleaned =
-          response.data.records.map(
-            (item: any) => ({
-
-              crop:
-                item.commodity,
-
-              price:
-                item.modal_price,
-
-              change:
-                "+0%"
-            })
-          );
-
-        setMarketData(cleaned);
+      // Backend returns: {prices: [...], source: "live_api" | "cached" | "estimated", lastUpdate: "...", totalCrops: number}
+      if (response?.prices && Array.isArray(response.prices)) {
+        setMarketData(response.prices);
+      } else {
+        throw new Error("Invalid response format: missing prices array");
       }
-
-    } catch (err) {
-
-      console.error(err);
-
+    } catch (err: any) {
+      const errorMsg = err.message || "Failed to load market prices";
+      setError(errorMsg);
+      console.error("Market API Error:", err);
+      
+      // Set fallback data even on error
+      if (marketData.length === 0) {
+        setMarketData([]);
+      }
     } finally {
-
-      setLoading(false);
+      if (showRefresh) setRefreshing(false);
+      else setLoading(false);
     }
   };
 
-  fetchMarketData();
+  useEffect(() => {
+    fetchMarketData();
+  }, []);
 
-}, []);
-if (loading) {
+  const handleRefresh = () => {
+    fetchMarketData(true);
+  };
 
-  return (
-
-    <div className="min-h-screen flex items-center justify-center">
-
-      <div className="text-lg font-semibold">
-        Loading market prices...
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg font-semibold">
+          Loading market prices...
+        </div>
       </div>
+    );
+  }
 
-    </div>
-  );
-}
   return (
     <div className="min-h-screen bg-background pb-10">
       <TopBar />
 
       <div className="px-4 pt-4 space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">{t("marketPrices")}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Today's mandi rates · Updated hourly
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">{t("marketPrices")}</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Today's mandi rates · Updated hourly
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="w-10 h-10 rounded-lg bg-card border border-border flex items-center justify-center hover:bg-muted transition-smooth active:scale-90 disabled:opacity-50"
+            title="Refresh prices"
+          >
+            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
         </div>
 
+        {error && (
+          <div className="bg-destructive/10 border border-destructive rounded-lg p-4 flex gap-3 items-start">
+            <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-destructive text-sm">Error Loading Market Prices</p>
+              <p className="text-sm text-destructive/80 mt-1">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {!error && marketData.length === 0 && (
+          <div className="bg-muted rounded-lg p-8 text-center">
+            <p className="text-muted-foreground">No market data available at the moment</p>
+            <button
+              onClick={handleRefresh}
+              className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {!error && marketData.length > 0 && (
+          <>
         {/* Top mover summary */}
         <div className="bg-gradient-to-br from-primary/10 via-card to-secondary/10 rounded-2xl p-4 border border-border shadow-soft animate-scale-in">
           <div className="flex items-center gap-3">
@@ -142,14 +154,21 @@ if (loading) {
               <div className="text-[10px] font-bold uppercase tracking-wider text-primary">
                 Today's top mover
               </div>
-              <div className="text-base font-bold text-foreground">{top.name}</div>
+              <div className="text-base font-bold text-foreground">{top?.crop || "No data"}</div>
             </div>
             <div className="text-right">
               <div className="text-xl font-bold text-foreground">
-                ₹{top.price.toLocaleString()}
+                ₹{(top?.price || 0)?.toLocaleString?.() || 0}
               </div>
-              <div className="text-xs font-semibold text-success flex items-center justify-end gap-0.5">
-                <TrendingUp className="w-3 h-3" /> +{top.change}%
+              <div className={`text-xs font-semibold flex items-center justify-end gap-0.5 ${
+                (top?.change || 0) > 0 ? "text-success" : "text-destructive"
+              }`}>
+                {(top?.change || 0) > 0 ? (
+                  <TrendingUp className="w-3 h-3" />
+                ) : (
+                  <TrendingDown className="w-3 h-3" />
+                )}
+                {(top?.change || 0) > 0 ? "+" : ""}{(top?.change || 0).toFixed(1)}%
               </div>
             </div>
           </div>
@@ -158,20 +177,15 @@ if (loading) {
         {/* Filter chips */}
         <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
           {[
-  {
-    id: "all",
-    name: "All crops"
-  },
-
-  ...marketData.map((p) => ({
-
-    id:
-      p.crop?.toLowerCase(),
-
-    name:
-      p.crop
-  }))
-].map((p) => (
+            {
+              id: "all",
+              name: "All crops",
+            },
+            ...marketData.slice(0, 10).map((p) => ({
+              id: p.crop?.toLowerCase() || "unknown",
+              name: p.crop || "Unknown",
+            })),
+          ].map((p) => (
             <button
               key={p.id}
               onClick={() => setFilter(p.id)}
@@ -181,12 +195,12 @@ if (loading) {
                   : "bg-card text-muted-foreground border-border hover:bg-muted"
               }`}
             >
-              {p.crop}
+              {p.name}
             </button>
           ))}
         </div>
 
-        {/* Bar graph */}
+        {/* Bar graph - Price comparison */}
         <div className="bg-card rounded-2xl p-4 shadow-soft border border-border hover-lift">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-foreground text-sm">
@@ -196,7 +210,8 @@ if (loading) {
           </div>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart
-data={marketData}              margin={{ top: 5, right: 10, left: -15, bottom: 0 }}
+              data={visible.slice(0, 8)}
+              margin={{ top: 5, right: 10, left: -15, bottom: 0 }}
             >
               <defs>
                 <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
@@ -204,9 +219,14 @@ data={marketData}              margin={{ top: 5, right: 10, left: -15, bottom: 0
                   <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.5} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="hsl(var(--border))"
+                vertical={false}
+              />
               <XAxis
-dataKey="crop"                axisLine={false}
+                dataKey="crop"
+                axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
               />
@@ -224,6 +244,7 @@ dataKey="crop"                axisLine={false}
                   fontSize: 12,
                 }}
                 cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
+                formatter={(value: any) => `₹${Number(value).toLocaleString()}`}
               />
               <Bar dataKey="price" fill="url(#barGrad)" radius={[8, 8, 0, 0]} />
             </BarChart>
@@ -233,29 +254,26 @@ dataKey="crop"                axisLine={false}
         {/* Price cards */}
         <div className="space-y-2.5">
           {visible.map((p) => {
-            const up =
-  !String(p.change)
-    .includes("-");
+            const up = !String(p.change || 0).includes("-");
+            const cropKey = p.crop?.toLowerCase() || "rice";
+            const cropImage = cropImages[cropKey] || cropImages.rice;
+
             return (
               <div
-                key={p.id}
+                key={p.id || p.crop}
                 className="bg-card rounded-2xl p-3 shadow-soft border border-border flex items-center gap-3 hover-lift animate-fade-up"
               >
                 <div className="w-16 h-16 rounded-xl overflow-hidden bg-muted flex-shrink-0 ring-1 ring-border">
                   <img
-                   src={
-  cropImages[
-    p.crop?.toLowerCase()
-  ]
-}
-                    alt={p.crop}
+                    src={cropImage}
+                    alt={p.crop || "Crop"}
                     className="w-full h-full object-cover"
                     loading="lazy"
                   />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-foreground text-base">
-                    {p.crop}
+                    {p.crop || "Unknown"}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {t("perQuintal")}
@@ -264,21 +282,21 @@ dataKey="crop"                axisLine={false}
                   <div className="mt-1.5 h-1 rounded-full bg-muted overflow-hidden">
                     <div
                       className={`h-full ${up ? "bg-success" : "bg-destructive"}`}
-                      style={{ width: `${Math.min(Math.abs(p.change) * 20, 100)}%` }}
+                      style={{
+                        width: `${Math.min(Math.abs(p.change || 0) * 20, 100)}%`,
+                      }}
                     />
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold text-foreground">
-                    ₹{
-  Number(
-    p.price
-  ).toLocaleString()
-}
+                    ₹{Number(p.price || 0).toLocaleString?.() || 0}
                   </div>
                   <div
                     className={`text-xs font-bold inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full ${
-                      up ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
+                      up
+                        ? "bg-success/10 text-success"
+                        : "bg-destructive/10 text-destructive"
                     }`}
                   >
                     {up ? (
@@ -286,8 +304,7 @@ dataKey="crop"                axisLine={false}
                     ) : (
                       <TrendingDown className="w-3 h-3" />
                     )}
-                    {up ? "+" : ""}
-                    {p.change}%
+                    {up ? "+" : ""}{(p.change || 0).toFixed(1)}%
                   </div>
                 </div>
               </div>
@@ -295,63 +312,66 @@ dataKey="crop"                axisLine={false}
           })}
         </div>
 
-        {/* Mini trend */}
-        <div className="bg-card rounded-2xl p-4 shadow-soft border border-border hover-lift">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="font-semibold text-foreground text-sm">
-              Rice · 6 month trend
-            </h3>
-            <span className="text-xs font-semibold text-success flex items-center gap-0.5">
-              <TrendingUp className="w-3 h-3" /> +13.5%
-            </span>
+        {/* Trend chart for selected crop */}
+        {trendData.length > 0 && (
+          <div className="bg-card rounded-2xl p-4 shadow-soft border border-border hover-lift">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-semibold text-foreground text-sm">
+                {selectedCrop?.crop || "Rice"} · 7-day trend
+              </h3>
+              <span className="text-xs font-semibold text-success flex items-center gap-0.5">
+                <TrendingUp className="w-3 h-3" /> +{(selectedCrop?.change || 0).toFixed(1)}%
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Showing price trend analysis
+            </p>
+            <ResponsiveContainer width="100%" height={140}>
+              <LineChart
+                data={trendData}
+                margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="trendGrad" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="hsl(var(--primary))" />
+                    <stop offset="100%" stopColor="hsl(var(--secondary))" />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis
+                  dataKey="day"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: 8,
+                    border: "1px solid hsl(var(--border))",
+                    background: "hsl(var(--card))",
+                    fontSize: 11,
+                  }}
+                  formatter={(value: any) => `₹${Number(value).toLocaleString()}`}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="price"
+                  stroke="url(#trendGrad)"
+                  strokeWidth={2.5}
+                  dot={{ r: 3, fill: "hsl(var(--primary))" }}
+                  activeDot={{ r: 5 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
-          <p className="text-xs text-muted-foreground mb-3">
-            Steady upward movement
-          </p>
-          <ResponsiveContainer width="100%" height={140}>
-            <LineChart
-              data={trend}
-              margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-              <XAxis
-                dataKey="m"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-              />
-              <YAxis
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-              />
-              <Tooltip
-                contentStyle={{
-                  borderRadius: 8,
-                  border: "1px solid hsl(var(--border))",
-                  boxShadow: "var(--shadow-card)",
-                  background: "hsl(var(--card))",
-                  fontSize: 12,
-                }}
-              />
-              <Line
-                type="monotone"
-                dataKey="p"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2.8}
-                dot={{ fill: "hsl(var(--primary))", r: 4, strokeWidth: 2, stroke: "hsl(var(--card))" }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        <button
-          onClick={() => navigate("/")}
-          className="w-full h-13 py-3.5 rounded-xl bg-gradient-primary text-primary-foreground text-base font-semibold shadow-button transition-smooth active:scale-[0.98] hover:opacity-95 flex items-center justify-center gap-2"
-        >
-          <Home className="w-4 h-4" /> {t("finish")}
-        </button>
+        )}
+          </>
+        )}
       </div>
     </div>
   );

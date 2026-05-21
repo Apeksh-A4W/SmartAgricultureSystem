@@ -21,13 +21,13 @@ const refreshAccessToken =
     try {
 
       const response =
-        await fetch(
+       await fetch(
 
-          `${API_BASE}/auth/token/refresh/`,
+  `${API_BASE}/auth/refresh/`,
 
-          {
+  {
 
-            method: "POST",
+    method: "POST",
 
             headers: {
 
@@ -63,90 +63,53 @@ const refreshAccessToken =
     }
 };
 
-export const apiFetch =
-  async (
+export const apiFetch = async (
+  endpoint: string,
+  options: RequestInit = {}
+) => {
+  let token = getToken();
 
-    endpoint: string,
+  const makeRequest = async (jwt: string | null) => {
+    const headers: HeadersInit = {
+      ...(options.headers || {}),
+    };
 
-    options: RequestInit = {}
-  ) => {
-
-    let token = getToken();
-
-    const makeRequest =
-      async (jwt: string | null) => {
-
-        const headers: HeadersInit = {
-
-          "Content-Type":
-            "application/json",
-
-          ...(options.headers || {}),
-        };
-
-        if (jwt) {
-
-          headers["Authorization"] =
-            `Bearer ${jwt}`;
-        }
-
-        return fetch(
-
-          `${API_BASE}${endpoint}`,
-
-          {
-
-            ...options,
-
-            headers
-          }
-        );
-      };
-
-    let response =
-      await makeRequest(token);
-
-    if (response.status === 401) {
-
-      const newAccess =
-        await refreshAccessToken();
-
-      if (newAccess) {
-
-        response =
-          await makeRequest(
-            newAccess
-          );
-
-      } else {
-
-        localStorage.removeItem(
-          "access"
-        );
-
-        localStorage.removeItem(
-          "refresh"
-        );
-
-        window.location.href =
-          "/login";
-      }
+    // Don't set Content-Type for FormData - browser handles it
+    if (!(options.body instanceof FormData)) {
+      headers["Content-Type"] = "application/json";
     }
 
-    const data =
-      await response.json();
-
-    if (!response.ok) {
-
-      throw new Error(
-
-        data.detail ||
-
-        data.error ||
-
-        "API request failed"
-      );
+    if (jwt) {
+      headers["Authorization"] = `Bearer ${jwt}`;
     }
 
-    return data;
+    return fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers,
+    });
+  };
+
+  let response = await makeRequest(token);
+
+  if (response.status === 401) {
+    const newAccess = await refreshAccessToken();
+
+    if (newAccess) {
+      response = await makeRequest(newAccess);
+    } else {
+      localStorage.removeItem("access");
+      localStorage.removeItem("refresh");
+      window.location.href = "/login";
+    }
+  }
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.detail || data.error || data.message || "API request failed"
+    );
+  }
+
+  return data;
 };

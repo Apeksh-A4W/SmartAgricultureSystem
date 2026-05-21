@@ -31,6 +31,7 @@ import {
   Flower2,
   Wheat,
   ArrowRight,
+  AlertCircle,
   AlertTriangle,
   CheckCircle2,
   Info,
@@ -41,17 +42,22 @@ import {
   Zap,
   Calendar,
   Brain,
+  TrendingDown,
 } from "lucide-react";
 import { cropImages } from "@/lib/cropImages";
 
-const yieldData = [
-  { week: "W1", yield: 0.5 },
-  { week: "W2", yield: 0.9 },
-  { week: "W3", yield: 1.4 },
-  { week: "W4", yield: 1.8 },
-  { week: "W5", yield: 2.2 },
-  { week: "W6", yield: 2.5 },
-];
+
+// Icon map for recommendation engine icon names
+const iconMap: Record<string, any> = {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  Info,
+  TrendingUp,
+  TrendingDown,
+};
+
+
 
 type WxCondition = "sunny" | "cloudy" | "rain" | "drizzle" | "partly";
 
@@ -106,73 +112,133 @@ const {
   t,
   crop,
   plantDate,
-  location
+  location,
+  npk
 } = useApp();  const [reportOpen, setReportOpen] = useState(false);
   const [currentWeather, setCurrentWeather] = useState<any>(null);
-const [forecastData, setForecastData] = useState<any[]>([]);
+  const [forecastData, setForecastData] = useState<any[]>([]);
+  const [trendData, setTrendData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-const [yieldValue, setYieldValue] = useState(0);  const yieldPct = (yieldValue / 4) * 100;
-  const currentStage = 1;
+  const [yieldValue, setYieldValue] = useState(0); 
+const confidence =
+  yieldValue > 3
+    ? 96
+    : yieldValue > 2
+    ? 90
+    : yieldValue > 1
+    ? 82
+    : 70;
+const yieldPct = (yieldValue / 4) * 100;
+const [recommendations, setRecommendations] =
+  useState<string[]>([]);
+  const currentStage =
+  yieldValue < 1
+    ? 0
+    : yieldValue < 2
+    ? 1
+    : yieldValue < 3
+    ? 2
+    : 3;
   const cropKey = crop?.toLowerCase() || "rice";
   const cropImg = cropImages[cropKey] || cropImages.rice;
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        let latest = null;
+        let weatherData = null;
 
-  const fetchData = async () => {
+        // Fetch prediction history
+        const predictionData = await apiFetch("/predictions/history/");
 
-    try {
+        if (predictionData?.results && predictionData.results.length > 0) {
+          latest = predictionData.results[0];
+          setYieldValue(latest?.predicted_yield || 0);
+        }
 
-      const predictionData =
-        await apiFetch(
-          "/predictions/history/"
-        );
+        // Fetch yield trends
+        const trendResponse = await apiFetch("/predictions/yield-trends/");
+        setTrendData(trendResponse?.trend_data || []);
 
-      if (
-        predictionData.results &&
-        predictionData.results.length > 0
-      ) {
-
-        const latest =
-          predictionData.results[0];
-
-        setYieldValue(
-          latest.predicted_yield
-        );
-      }
-
-      if (location) {
-
-        const weatherData =
-          await apiFetch(
+        // Fetch weather data
+        if (location?.lat && location?.lon) {
+          weatherData = await apiFetch(
             `/weather/current/?lat=${location.lat}&lon=${location.lon}`
           );
+          setCurrentWeather(weatherData || null);
 
-        setCurrentWeather(weatherData);
-
-        const forecast =
-          await apiFetch(
+          const forecast = await apiFetch(
             `/weather/forecast/?lat=${location.lat}&lon=${location.lon}`
           );
+          setForecastData(forecast?.forecast || []);
+        }
 
-        setForecastData(
-          forecast.forecast || []
-        );
+        // Fetch recommendations
+        if (npk) {
+          const advice = await apiFetch("/recommendations/farming-advice/", {
+            method: "POST",
+            body: JSON.stringify({
+              nitrogen: npk.nitrogen || 0,
+              phosphorus: npk.phosphorus || 0,
+              potassium: npk.potassium || 0,
+              temperature: weatherData?.temperature || 25,
+              humidity: weatherData?.humidity || 60,
+              rainfall: weatherData?.rainfall || 100,
+              weather: weatherData?.weather_condition || "Sunny",
+              prediction: latest?.predicted_yield || 0,
+              crop_type: crop || "rice",
+              soil_type: "loamy",
+              irrigation_used: 1,
+            }),
+          });
+
+          // Handle both array and object responses
+          const recs = Array.isArray(advice) ? advice : (advice?.recommendations || []);
+          setRecommendations(recs);
+        }
+      } catch (err: any) {
+        const errorMsg = err.message || "Failed to load prediction data";
+        setError(errorMsg);
+        console.error("Fetch error:", err);
+      } finally {
+        setLoading(false);
       }
+    };
 
-    } catch (err) {
+    fetchData();
+  }, [location, npk]);
 
-      console.error(err);
-    }
-  };
-
-  fetchData();
-
-}, [location]);
 
   return (
     <div className="min-h-screen bg-background pb-10">
       <TopBar />
       <ProgressSteps current={5} total={5} />
 
+      {loading && (
+        <div className="px-4 pt-8 text-center">
+          <div className="animate-pulse text-lg font-semibold">
+            Loading prediction data...
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="px-4 pt-4">
+          <div className="bg-destructive/10 border border-destructive rounded-lg p-4 flex gap-3">
+            <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-destructive text-sm">Error Loading Data</p>
+              <p className="text-sm text-destructive/80 mt-1">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!loading && !error && (
+        <>
       <div className="px-4 pt-3 space-y-4">
         {/* Hero Yield Card with crop image */}
         <div className="bg-card rounded-2xl shadow-card border border-border overflow-hidden animate-scale-in">
@@ -210,7 +276,7 @@ const [yieldValue, setYieldValue] = useState(0);  const yieldPct = (yieldValue /
                 )}
               </span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-semibold">
-                95% confidence
+                {confidence}% confidence
               </span>
             </div>
           )}
@@ -246,7 +312,7 @@ const [yieldValue, setYieldValue] = useState(0);  const yieldPct = (yieldValue /
           </div>
           <ResponsiveContainer width="100%" height={160}>
             <AreaChart
-              data={yieldData}
+              data={trendData}
               margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
             >
               <defs>
@@ -256,12 +322,7 @@ const [yieldValue, setYieldValue] = useState(0);  const yieldPct = (yieldValue /
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-              <XAxis
-                dataKey="week"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-              />
+            <XAxis dataKey="date" />
               <YAxis
                 axisLine={false}
                 tickLine={false}
@@ -288,8 +349,11 @@ const [yieldValue, setYieldValue] = useState(0);  const yieldPct = (yieldValue /
         </div>
 
         {/* Weather — premium dashboard */}
-        <WeatherSection title={t("weather")} />
-
+<WeatherSection
+  title={t("weather")}
+  currentWeather={currentWeather}
+  forecastData={forecastData}
+/>
         {/* Growth Stage — premium timeline */}
         <GrowthSection
           title={t("growthStage")}
@@ -300,40 +364,27 @@ const [yieldValue, setYieldValue] = useState(0);  const yieldPct = (yieldValue /
         {/* AI Recommendations */}
         <RecommendationsSection
           title={t("advice")}
-          items={[
-            {
-              Icon: CloudRain,
-              title: "Rain expected in 2 days",
-              text: t("rainSoon"),
-              tone: "warning",
-              priority: "Medium",
-              confidence: 86,
-            },
-            {
-              Icon: CheckCircle2,
-              title: "Optimal sunlight conditions",
-              text: t("goodSun"),
-              tone: "success",
-              priority: "Good",
-              confidence: 94,
-            },
-            {
-              Icon: AlertTriangle,
-              title: "Heavy rainfall warning",
-              text: t("heavyRain"),
-              tone: "danger",
-              priority: "Urgent",
-              confidence: 91,
-            },
-            {
-              Icon: Info,
-              title: "Reduce fertilizer dosage",
-              text: t("useLessFert"),
-              tone: "info",
-              priority: "Tip",
-              confidence: 78,
-            },
-          ]}
+          items={
+            (recommendations && Array.isArray(recommendations))
+              ? recommendations.map((r: any, i: number) => ({
+                  Icon: iconMap[r.icon] || (r.severity === "danger" ? AlertTriangle : r.severity === "success" ? CheckCircle2 : Info),
+                  title: r.title || `Recommendation ${i + 1}`,
+                  text: r.description || r.title || "No description available",
+                  tone: r.severity === "danger" ? "danger" : r.severity === "warning" ? "warning" : r.severity === "success" ? "success" : "info",
+                  priority: r.severity === "danger" ? "HIGH" : r.severity === "warning" ? "MEDIUM" : "INFO",
+                  confidence: r.confidence || 85,
+                }))
+              : [
+                  {
+                    Icon: Info,
+                    title: "No Recommendations",
+                    text: "Could not load recommendations",
+                    tone: "info" as const,
+                    priority: "INFO",
+                    confidence: 0,
+                  },
+                ]
+          }
         />
 
         {/* Buttons */}
@@ -351,6 +402,8 @@ const [yieldValue, setYieldValue] = useState(0);  const yieldPct = (yieldValue /
           <Send className="w-4 h-4" /> {t("sendReport")}
         </button>
       </div>
+        </>
+      )}
 
       <ReportDialog
         open={reportOpen}
@@ -362,13 +415,30 @@ const [yieldValue, setYieldValue] = useState(0);  const yieldPct = (yieldValue /
 };
 
 /* ---------- Weather Section ---------- */
-const WeatherSection = ({ title }: { title: string }) => {
-  const [active, setActive] = useState(0);
-  const w = weather[active];
+const WeatherSection = ({
+  title,
+  currentWeather,
+  forecastData
+}: any) => {  const [active, setActive] = useState(0);
+  const forecastWeather = currentWeather
+    ? {
+        temp: currentWeather.temperature,
+        low: currentWeather.temperature - 5,
+        label: currentWeather.weather_condition,
+        wind: currentWeather.wind_speed,
+        humidity: currentWeather.humidity,
+      }
+    : null;
+
+  const w =
+    forecastData && forecastData.length > 0
+      ? forecastData[active] || weather[active]
+      : weather[active] || weather[0];
+
   return (
     <div className="rounded-2xl p-4 border border-border shadow-card overflow-hidden glass relative">
       <div
-        className={`absolute inset-0 -z-10 bg-gradient-to-br ${wxBg[w.cond]} transition-all duration-500`}
+        className={`absolute inset-0 -z-10 bg-gradient-to-br ${wxBg[w?.cond || "sunny"]} transition-all duration-500`}
       />
       <div className="flex items-center justify-between mb-3">
         <div>
@@ -378,10 +448,12 @@ const WeatherSection = ({ title }: { title: string }) => {
             </span>
             {title}
           </h3>
-          <p className="text-[11px] text-muted-foreground mt-0.5">7-day outlook · Live</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            {currentWeather ? "Live data" : "7-day outlook"}
+          </p>
         </div>
         <span className="text-[10px] uppercase tracking-wider font-bold text-secondary px-2 py-0.5 rounded-full bg-secondary/10">
-          Live
+          {currentWeather ? "Live" : "Forecast"}
         </span>
       </div>
 
@@ -389,40 +461,37 @@ const WeatherSection = ({ title }: { title: string }) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-secondary/20 to-primary/10 flex items-center justify-center overflow-hidden">
-              <AnimatedWeatherIcon cond={w.cond} Icon={w.Icon} />
+              <AnimatedWeatherIcon
+                cond={currentWeather?.weather_condition?.toLowerCase().includes("rain") ? "rain" : "sunny"}
+                Icon={w?.Icon || Sun}
+              />
             </div>
             <div>
               <div className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider">
-                {w.day} · {w.date}
+                {currentWeather ? "Now" : w?.day || "Today"} · {currentWeather ? new Date().toLocaleDateString() : w?.date || "Today"}
               </div>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-bold text-foreground">{
-  currentWeather?.temperature ||
-  w.temp
-}°</span>
-                <span className="text-xs text-muted-foreground">/ {w.low}°</span>
+                <span className="text-3xl font-bold text-foreground">
+                  {forecastWeather?.temp || currentWeather?.temperature || 28}°
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  / {forecastWeather?.low || currentWeather?.temperature - 5 || 19}°
+                </span>
               </div>
-              <div className="text-xs font-medium text-foreground/80">{
-  currentWeather?.weather_condition ||
-  w.label
-}</div>
+              <div className="text-xs font-medium text-foreground/80">
+                {forecastWeather?.label || currentWeather?.weather_condition || "Sunny"}
+              </div>
             </div>
           </div>
           <div className="flex flex-col gap-1.5 text-[11px]">
             <span className="inline-flex items-center gap-1 text-secondary">
-              <Droplets className="w-3 h-3" /> {w.rain}%
+              <Droplets className="w-3 h-3" /> {w?.rain || currentWeather?.humidity || 0}%
             </span>
             <span className="inline-flex items-center gap-1 text-muted-foreground">
-              <Wind className="w-3 h-3" /> {
-  currentWeather?.wind_speed ||
-  w.wind
-} km/h
+              <Wind className="w-3 h-3" /> {forecastWeather?.wind || currentWeather?.wind_speed || 8} km/h
             </span>
             <span className="inline-flex items-center gap-1 text-muted-foreground">
-              <Zap className="w-3 h-3" /> {
-  currentWeather?.humidity ||
-  w.humidity
-}%
+              <Zap className="w-3 h-3" /> {forecastWeather?.humidity || currentWeather?.humidity || 40}%
             </span>
           </div>
         </div>

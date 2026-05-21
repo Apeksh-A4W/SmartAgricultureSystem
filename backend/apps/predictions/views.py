@@ -113,7 +113,7 @@ class PredictionHistoryView(APIView):
 
         predictions = CropPrediction.objects.filter(
             user=request.user
-        )
+        ).order_by('-created_at')
 
         serializer = CropPredictionSerializer(
             predictions,
@@ -136,7 +136,7 @@ class PredictionAnalyticsView(APIView):
 
         predictions = CropPrediction.objects.filter(
             user=request.user
-        )
+        ).order_by('-created_at')
 
         total_predictions = predictions.count()
 

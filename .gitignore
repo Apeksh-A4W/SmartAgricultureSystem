@@ -1,22 +1,39 @@
-# Node
-node_modules/
-dist/
-
 # Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 *.sqlite3
 db.sqlite3
-venv/
-.venv/
-
-# Environment
 .env
-backend/.env
-frontned/.env
+.venv/
+venv/
+
+# Django static/media
+media/
+staticfiles/
+
+# Node
+node_modules/
+dist/
+build/
+
+# Vite
+.vite/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
 
 # VS Code
 .vscode/
 
-# Logs
-npm-debug.log*
+# ML large files (optional)
+*.pkl
+*.joblib
+
+# Cache
+.cache/
