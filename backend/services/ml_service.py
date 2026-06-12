@@ -23,7 +23,7 @@ print("\nML MODEL LOADED SUCCESSFULLY\n")
 
 class MLService:
 
-    @staticmethod   //data fields
+    @staticmethod   //Available data fields
     def predict_crop_yield(data):
 
         input_df = pd.DataFrame([{
