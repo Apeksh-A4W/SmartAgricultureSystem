@@ -8,6 +8,17 @@ from django.core.cache import cache
 API_KEY = os.getenv("DATA_GOV_API_KEY")
 
 
+def _safe_float(value, fallback=0.0):
+    try:
+        return float(value or fallback)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _normalize_crop_name(name):
+    return str(name or "").strip()  # env key for data.gov.in
+
+
 class MarketPriceService:
     """Market price service with caching, fallback data, and trend calculation."""
 
@@ -111,21 +122,26 @@ class MarketPriceService:
             response.raise_for_status()
             data = response.json()
 
-            prices = []
-            records = data.get("records", []) or data.get("results", [])
+            unique_prices = {}
+            records = data.get("records", []) or data.get("results", []) or []
 
             for item in records:
                 crop_name = item.get("commodity", item.get("name", "Unknown"))
-                price = float(item.get("modal_price", item.get("price", 0)) or 0)
+                price = float(item.get("modal_price") or item.get("price") or 0 or 0)
                 change = float(item.get("price_change", 0) or 0)
-                
-                if price > 0:  # Only add valid prices
-                    prices.append({
+                if price > 0:
+                    crop_key = crop_name.lower()
+
+                    fallback = MarketPriceService.FALLBACK_PRICES.get(crop_key, {})
+
+                    unique_prices[crop_key] = {
                         "crop": crop_name,
                         "price": price,
-                        "change": change
-                    })
-
+                        "change": change,
+                        "trend": fallback.get("trend", [])
+                    }
+                
+            prices = list(unique_prices.values())
             if prices:
                 return MarketPriceService.set_cached_prices(prices, "live_api")
 
@@ -144,7 +160,8 @@ class MarketPriceService:
             prices.append({
                 "crop": crop_name,
                 "price": fallback_data.get("price", 0),
-                "change": fallback_data.get("change", 0)
+                "change": fallback_data.get("change", 0),
+                "trend": fallback_data.get("trend", []),
             })
 
         return MarketPriceService.set_cached_prices(prices, "estimated")

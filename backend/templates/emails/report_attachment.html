@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #f9f9f9; padding: 20px; border-radius: 8px; }
+        .header { background: linear-gradient(135deg, #2c5f4f 0%, #4a8a6f 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .content { background: white; padding: 30px; }
+        .attachment-info { background: #f0f0f0; padding: 15px; margin: 20px 0; border-radius: 4px; border-left: 4px solid #4a8a6f; }
+        .attachment-icon { font-size: 30px; }
+        .attachment-name { font-weight: bold; color: #2c5f4f; margin-top: 10px; }
+        .footer { background: #f0f0f0; padding: 20px; text-align: center; font-size: 12px; color: #666; border-radius: 0 0 8px 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{ subject }}</h1>
+        </div>
+        <div class="content">
+            <p>Hi {{ user.first_name|default:user.username }},</p>
+            <p>{{ intro }}</p>
+            
+            <div class="attachment-info">
+                <div class="attachment-icon">📄</div>
+                <div class="attachment-name">{{ report_name }}.pdf</div>
+                <p style="margin: 10px 0 0 0; color: #666; font-size: 12px;">
+                    The report is attached to this email. You can download and save it for your records.
+                </p>
+            </div>
+            
+            <p style="margin-top: 20px;">
+                <strong>Report Contents:</strong>
+            </p>
+            <ul style="color: #555;">
+                <li>Crop Information</li>
+                <li>Yield Predictions</li>
+                <li>Weather Analysis</li>
+                <li>Soil Conditions</li>
+                <li>Fertilizer Recommendations</li>
+                <li>AI-Generated Insights</li>
+            </ul>
+            
+            <p style="color: #666; margin-top: 20px; font-size: 14px;">
+                Keep this report safe for your farm records. It contains important data about your current farming cycle.
+            </p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2026 Smart Farming System. All rights reserved.</p>
+            <p>This is an automated email, please do not reply.</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -30,16 +30,17 @@ const Market = () => {
 
   // Generate trend data for selected crop (or rice if none selected)
   const selectedCrop = filter === "all" ? marketData[0] : marketData.find(p => p.crop?.toLowerCase() === filter);
-  const trendData = selectedCrop
-    ? Array.from({ length: 7 }, (_, i) => {
-        const basePrice = selectedCrop.price || 2000;
-        const variance = (selectedCrop.change || 0) * 10;
-        return {
-          day: `Day ${i + 1}`,
-          price: Math.round(basePrice - (variance * (6 - i) / 6) + Math.random() * 50),
-        };
-      })
-    : [];
+  // Generate trend visualization from price change percentage
+  // NOTE: This is a linear projection based on current price and change, NOT real historical data
+  // For real historical trends, we would need to track price history in database
+  const trendData =
+  selectedCrop?.trend?.map(
+    (price: number, index: number) => ({
+      day: `Day ${index + 1}`,
+      price,
+    })
+  ) || [];
+  const [marketSource, setMarketSource] = useState("");
 
   const visible =
     filter === "all"
@@ -62,6 +63,7 @@ const Market = () => {
       // Backend returns: {prices: [...], source: "live_api" | "cached" | "estimated", lastUpdate: "...", totalCrops: number}
       if (response?.prices && Array.isArray(response.prices)) {
         setMarketData(response.prices);
+        setMarketSource(response.source || "");
       } else {
         throw new Error("Invalid response format: missing prices array");
       }
@@ -141,7 +143,13 @@ const Market = () => {
             </button>
           </div>
         )}
-
+        {marketSource === "estimated" && (
+          <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-3">
+            <p className="text-sm text-yellow-800">
+              Live market data unavailable. Showing historical average prices.
+            </p>
+          </div>
+        )}
         {!error && marketData.length > 0 && (
           <>
         {/* Top mover summary */}

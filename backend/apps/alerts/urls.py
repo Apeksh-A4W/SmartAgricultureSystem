@@ -1,12 +1,12 @@
 from django.urls import path
 
 from .views import (
-
     ReportAlertView,
-
     NearbyAlertsView,
-
-    AlertAnalyticsView
+    AlertAnalyticsView,
+    AlertDetailView,
+    DismissAlertView,
+    UserAlertsView
 )
 
 
@@ -22,6 +22,24 @@ urlpatterns = [
         'nearby/',
         NearbyAlertsView.as_view(),
         name='nearby_alerts'
+    ),
+
+    path(
+        'my-alerts/',
+        UserAlertsView.as_view(),
+        name='user_alerts'
+    ),
+
+    path(
+        '<int:alert_id>/',
+        AlertDetailView.as_view(),
+        name='alert_detail'
+    ),
+
+    path(
+        '<int:alert_id>/dismiss/',
+        DismissAlertView.as_view(),
+        name='dismiss_alert'
     ),
 
     path(

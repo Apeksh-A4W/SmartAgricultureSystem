@@ -30,7 +30,7 @@ class CropPrediction(models.Model):
 
     predicted_yield = models.FloatField()
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
 
     class Meta:
 

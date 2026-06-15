@@ -14,7 +14,7 @@ class LiveMarketPriceView(APIView):
 
     def get(self, request):
         """Get market prices for all crops or specific crop."""
-        try:
+        try: 
             crop = request.GET.get('crop')
             data = MarketPriceService.get_prices(crop)
             return Response(data, status=status.HTTP_200_OK)

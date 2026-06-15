@@ -76,19 +76,22 @@ const handleNext = async () => {
   try {
     setFertilizer(choice);
     setPredictionError(null);
-
+ 
     if (!location) {
       setPredictionError("Location data is missing. Please go back and provide location.");
       return;
     }
-
+ 
     setPredictionLoading(true);
-
+ 
     // FETCH CURRENT WEATHER
     const weatherData = await apiFetch(
       `/weather/current/?lat=${location.lat}&lon=${location.lon}`
     );
-
+ 
+    // ✅ FIX: Persist weather to context so Result.tsx can read it
+    setWeatherData(weatherData);
+ 
     // CALCULATE DAYS
     const daysToHarvest = plantDate
       ? Math.floor(
@@ -96,7 +99,7 @@ const handleNext = async () => {
           (1000 * 60 * 60 * 24)
         )
       : 90;
-
+ 
     // PREDICTION REQUEST
     const predictionData = await apiFetch("/predictions/predict/", {
       method: "POST",
@@ -109,12 +112,13 @@ const handleNext = async () => {
         fertilizer_used: choice ? 1 : 0,
         irrigation_used: 1,
         weather_condition: weatherData.weather_condition || "Sunny",
-        days_to_harvest: daysToHarvest
+        days_to_harvest: daysToHarvest,
       }),
     });
-
+ 
+    // ✅ Store full prediction response in context
     setPredictionResult(predictionData);
-
+ 
     // FETCH RECOMMENDATIONS
     const recommendationData = await apiFetch(
       "/recommendations/farming-advice/",
@@ -135,14 +139,14 @@ const handleNext = async () => {
         }),
       }
     );
-
+ 
     // Handle both array and object responses
-    const recs = Array.isArray(recommendationData) 
-      ? recommendationData 
-      : (recommendationData?.recommendations || []);
-    
+    const recs = Array.isArray(recommendationData)
+      ? recommendationData
+      : recommendationData?.recommendations || [];
+ 
     setRecommendations(recs);
-
+ 
     navigate("/result");
   } catch (err: any) {
     const errorMsg = err.message || "Prediction failed. Please try again.";

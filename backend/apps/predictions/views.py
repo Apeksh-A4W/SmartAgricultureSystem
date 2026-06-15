@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework.views import APIView
 
 from rest_framework.response import Response
@@ -18,6 +20,9 @@ from .models import CropPrediction
 from .serializers import CropPredictionSerializer
 
 
+
+logger = logging.getLogger(__name__)
+
 class CropPredictionView(APIView):
 
     permission_classes = [IsAuthenticated]
@@ -32,26 +37,21 @@ class CropPredictionView(APIView):
 
             data = serializer.validated_data
 
-            prediction = MLService.predict_crop_yield({
-
+            prediction_input = {
                 "region": data['region'],
-
                 "soil_type": data['soil_type'],
-
                 "crop": data['crop'],
-
                 "rainfall_mm": data['rainfall_mm'],
-
                 "temperature_celsius": data['temperature_celsius'],
-
                 "fertilizer_used": data['fertilizer_used'],
-
                 "irrigation_used": data['irrigation_used'],
-
                 "weather_condition": data['weather_condition'],
-
                 "days_to_harvest": data['days_to_harvest']
-            })
+            }
+            logger.info(f"[PREDICTION] Input data: {prediction_input}")
+            
+            prediction = MLService.predict_crop_yield(prediction_input)
+            logger.info(f"[PREDICTION] ML Model output: {prediction} tons/hectare")
 
             recommendations = (
                 RecommendationService.generate_recommendations(
@@ -59,6 +59,7 @@ class CropPredictionView(APIView):
                     prediction
                 )
             )
+            logger.info(f"[PREDICTION] Generated {len(recommendations)} recommendations")
 
             crop_prediction = CropPrediction.objects.create(
 
@@ -187,7 +188,7 @@ class PredictionAnalyticsView(APIView):
                 )
             }
         })
-
+    
 
 class YieldTrendView(APIView):
 

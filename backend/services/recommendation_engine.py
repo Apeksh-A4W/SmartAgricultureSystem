@@ -27,6 +27,7 @@ def generate_recommendations(
     """
     
     recommendations = []
+    weather_lower =( weather_condition.lower() if weather_condition else "sunny")
     
     # ===== NITROGEN RECOMMENDATIONS =====
     if nitrogen < 20:
@@ -285,53 +286,101 @@ def generate_recommendations(
         })
     
     # ===== RAINFALL RECOMMENDATIONS =====
-    if rainfall > 150:
+    # ===== WEATHER + RAINFALL COMBINED ANALYSIS =====
+
+    is_rain_expected = (
+        "rain" in weather_lower
+        or "drizzle" in weather_lower
+        or humidity > 85
+    )
+
+    if is_rain_expected:
+
         recommendations.append({
-            "title": "Heavy Rainfall Alert",
-            "description": "Excessive rainfall detected. Risk of waterlogging and root diseases.",
-            "severity": "warning",
-            "confidence": 82,
-            "actionable_steps": [
-                "Ensure good field drainage",
-                "Avoid applying water-soluble nutrients (will be washed away)",
-                "Monitor for root rot symptoms",
-                "Apply fungicide if waterlogging occurs",
-                "Delay planting if soil is waterlogged"
-            ],
-            "related_factor": f"Rainfall: {rainfall} mm",
-            "category": "weather",
-            "icon": "AlertTriangle"
-        })
-    elif rainfall < 50:
-        recommendations.append({
-            "title": "Low Rainfall - Drought Risk",
-            "description": "Insufficient rainfall. Irrigation essential for crop survival.",
+            "title": "Rainfall Expected",
+            "description": "Wet weather conditions detected. Focus on disease prevention and drainage management.",
             "severity": "warning",
             "confidence": 90,
             "actionable_steps": [
-                "Increase irrigation to compensate for low rainfall",
-                "Apply mulch to retain soil moisture",
-                "Use drought-resistant varieties if possible",
-                "Schedule irrigation during cooler hours (early morning/evening)"
+                "Ensure proper field drainage",
+                "Avoid excess irrigation",
+                "Monitor fungal diseases",
+                "Avoid applying water-soluble fertilizers before rain",
+                "Inspect roots for waterlogging symptoms"
             ],
-            "related_factor": f"Rainfall: {rainfall} mm",
-            "category": "irrigation",
-            "icon": "AlertTriangle"
-        })
-    else:
-        recommendations.append({
-            "title": "Rainfall Normal",
-            "description": "Rainfall is adequate for crop requirements.",
-            "severity": "success",
-            "confidence": 85,
-            "actionable_steps": [
-                "Continue standard irrigation practices",
-                "Monitor weather for significant changes"
-            ],
-            "related_factor": f"Rainfall: {rainfall} mm",
+            "related_factor": f"Weather: {weather_condition}",
             "category": "weather",
-            "icon": "CheckCircle2"
+            "icon": "AlertCircle"
         })
+
+        if rainfall > 150:
+            recommendations.append({
+                "title": "Waterlogging Risk",
+                "description": "Heavy rainfall may cause root damage and nutrient leaching.",
+                "severity": "warning",
+                "confidence": 92,
+                "actionable_steps": [
+                    "Open drainage channels",
+                    "Monitor root health",
+                    "Delay fertilizer applications",
+                    "Inspect low-lying field areas"
+                ],
+                "related_factor": f"Rainfall: {rainfall} mm",
+                "category": "weather",
+                "icon": "AlertTriangle"
+            })
+
+    else:
+
+        if rainfall < 60:
+
+            recommendations.append({
+                "title": "Low Rainfall - Drought Risk",
+                "description": "Insufficient rainfall detected. Irrigation support recommended.",
+                "severity": "warning",
+                "confidence": 90,
+                "actionable_steps": [
+                    "Increase irrigation frequency",
+                    "Apply mulch",
+                    "Monitor soil moisture",
+                    "Avoid water stress during flowering"
+                ],
+                "related_factor": f"Rainfall: {rainfall} mm",
+                "category": "irrigation",
+                "icon": "AlertTriangle"
+            })
+
+        elif rainfall > 150:
+
+            recommendations.append({
+                "title": "Heavy Rainfall Alert",
+                "description": "Excess rainfall may reduce oxygen availability in root zone.",
+                "severity": "warning",
+                "confidence": 85,
+                "actionable_steps": [
+                    "Improve drainage",
+                    "Inspect root health",
+                    "Delay fertilizer applications"
+                ],
+                "related_factor": f"Rainfall: {rainfall} mm",
+                "category": "weather",
+                "icon": "AlertTriangle"
+            })
+
+        else:
+
+            recommendations.append({
+                "title": "Rainfall Normal",
+                "description": "Rainfall levels are currently suitable.",
+                "severity": "success",
+                "confidence": 85,
+                "actionable_steps": [
+                    "Continue current irrigation schedule"
+                ],
+                "related_factor": f"Rainfall: {rainfall} mm",
+                "category": "weather",
+                "icon": "CheckCircle2"
+            })
     
     # ===== YIELD PREDICTION RECOMMENDATIONS =====
     if predicted_yield < 2:
@@ -385,42 +434,11 @@ def generate_recommendations(
         })
     
     # ===== WEATHER CONDITION SPECIFIC RECOMMENDATIONS =====
-    weather_lower = weather_condition.lower() if weather_condition else "sunny"
     
-    if "rain" in weather_lower or "drizzle" in weather_lower:
-        recommendations.append({
-            "title": "Rainy Period - Crop Protection",
-            "description": "Wet weather conditions detected. Take precautions against fungal diseases.",
-            "severity": "info",
-            "confidence": 80,
-            "actionable_steps": [
-                "Avoid applying powdery fertilizers",
-                "Schedule fungicide sprays on dry days",
-                "Ensure field has good drainage",
-                "Postpone harvesting sensitive crops",
-                "Apply Bordeaux mixture or similar fungicide"
-            ],
-            "related_factor": f"Weather: {weather_condition}",
-            "category": "pest",
-            "icon": "AlertCircle"
-        })
+    
+   
     
     # Ensure we always have at least 3 recommendations
-    if len(recommendations) < 3:
-        recommendations.append({
-            "title": "General Crop Management",
-            "description": "Continue with regular monitoring and standard practices.",
-            "severity": "info",
-            "confidence": 75,
-            "actionable_steps": [
-                "Monitor soil moisture regularly",
-                "Scout for pests and diseases weekly",
-                "Maintain weed-free field",
-                "Keep records of inputs and outcomes"
-            ],
-            "related_factor": "General practice",
-            "category": "management",
-            "icon": "Info"
-        })
+    
     
     return recommendations

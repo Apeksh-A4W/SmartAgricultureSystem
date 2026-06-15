@@ -6,8 +6,15 @@ from .views import (
     RegisterView,
     LoginView,
     ProfileView,
-    LogoutView
+    LogoutView,
+    VerifyEmailView,
+    ResendVerificationEmailView,
+    PasswordResetRequestView,
+    PasswordResetView,
+    ChangePasswordView,
+    GoogleLoginView
 )
+
 urlpatterns = [
 
     path(
@@ -26,6 +33,31 @@ urlpatterns = [
         name='token_refresh'
     ),
     path(
+        'verify-email/',
+        VerifyEmailView.as_view(),
+        name='verify_email'
+    ),
+    path(
+        'resend-verification/',
+        ResendVerificationEmailView.as_view(),
+        name='resend_verification'
+    ),
+    path(
+        'password-reset/',
+        PasswordResetRequestView.as_view(),
+        name='password_reset_request'
+    ),
+    path(
+        'password-reset-confirm/',
+        PasswordResetView.as_view(),
+        name='password_reset_confirm'
+    ),
+    path(
+        'change-password/',
+        ChangePasswordView.as_view(),
+        name='change_password'
+    ),
+    path(
         'profile/',
         ProfileView.as_view(),
         name='profile'
@@ -34,5 +66,10 @@ urlpatterns = [
         'logout/',
         LogoutView.as_view(),
         name='logout'
+    ),
+    path(
+        'google/',
+        GoogleLoginView.as_view(),
+        name='google_login'
     ),
 ]

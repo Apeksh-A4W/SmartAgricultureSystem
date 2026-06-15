@@ -1,4 +1,4 @@
-﻿from services.market_service import MarketPriceService
+from services.market_service import MarketPriceService
 prices = MarketPriceService.get_prices()
 print(f'Total crops: {len(prices.get("prices", []))}')
 print(f'Source: {prices.get("source")}')

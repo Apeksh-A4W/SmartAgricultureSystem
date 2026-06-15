@@ -83,7 +83,8 @@ class CurrentWeatherView(APIView):
                 weather_data["wind"]["speed"],
 
             "clouds":
-                weather_data["clouds"]["all"]
+                weather_data["clouds"]["all"],
+            "rainfall": weather_data.get("rain", {}).get("1h", 0)
         }
 
         return Response(response_data)
