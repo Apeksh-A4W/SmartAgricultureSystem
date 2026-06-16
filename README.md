@@ -6,6 +6,7 @@ AI-powered smart farming system with:
 - Market price analysis
 - Weather integration
 - AI farming recommendations
+- develops rural area
 
 # Setup
 
@@ -36,3 +37,4 @@ http://localhost:8080
 
 Backend:
 http://127.0.0.1:8000
+
