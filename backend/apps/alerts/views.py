@@ -47,7 +47,10 @@ class ReportAlertView(APIView):
             alert = serializer.save(user=request.user)
             
             # Notify nearby users asynchronously
-            NotificationService.notify_nearby_users_about_alert(alert)
+            try:
+                NotificationService.notify_nearby_users_about_alert(alert)
+            except Exception:
+                logger.exception("Failed to notify nearby users for alert %s", alert.id)
 
             return Response({
                 "message": "Alert reported successfully",
@@ -73,9 +76,23 @@ class NearbyAlertsView(APIView):
                 "error": "latitude and longitude are required"
             }, status=status.HTTP_400_BAD_REQUEST)
 
+        try:
+            user_lat = float(user_lat)
+            user_lon = float(user_lon)
+        except (TypeError, ValueError):
+            return Response({
+                "error": "latitude and longitude must be valid numbers"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         alert_type = request.GET.get('type')
         severity = request.GET.get('severity')
-        radius_km = int(request.GET.get('radius', 10))
+
+        try:
+            radius_km = float(request.GET.get('radius', 10))
+        except (TypeError, ValueError):
+            radius_km = 10.0
+
+        radius_km = max(radius_km, 0)
 
         # Get active, non-expired alerts
         alerts = CommunityAlert.objects.filter(
@@ -91,8 +108,8 @@ class NearbyAlertsView(APIView):
                 continue
 
             distance = calculate_distance(
-                float(user_lat),
-                float(user_lon),
+                user_lat,
+                user_lon,
                 alert.latitude,
                 alert.longitude
             )

@@ -15,6 +15,9 @@ class OCRService:
 
         image = cv2.imread(image_path)
 
+        if image is None:
+            return None, None, None
+
         image = cv2.resize(
             image,
             None,
@@ -89,10 +92,16 @@ class OCRService:
             image_path
         )
 
+        if image is None or gray is None or edged is None:
+            return ""
+
         regions = OCRService.find_text_regions(
             image,
             edged
         )
+
+        if not regions:
+            regions = [image]
 
         full_text = ""
 
@@ -124,10 +133,19 @@ class OCRService:
         print("\n===== OCR TEXT =====\n")
         print(full_text)
 
-        return full_text
+        return full_text.strip()
 
     @staticmethod
     def extract_npk_values(text):
+
+        if not text:
+            return {
+                "nitrogen": None,
+                "phosphorus": None,
+                "potassium": None
+            }
+
+        normalized_text = re.sub(r'\s+', ' ', text)
 
         patterns = [
 
@@ -142,7 +160,7 @@ class OCRService:
 
             match = re.search(
                 pattern,
-                text,
+                normalized_text,
                 re.IGNORECASE
             )
 

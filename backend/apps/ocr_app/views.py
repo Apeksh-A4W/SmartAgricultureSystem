@@ -1,4 +1,5 @@
 import os
+import logging
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -11,6 +12,8 @@ from django.core.files.storage import default_storage
 from services.ocr_service import OCRService
 
 from .serializers import SoilReportUploadSerializer
+
+logger = logging.getLogger(__name__)
 
 
 class SoilOCRView(APIView):
@@ -35,7 +38,11 @@ class SoilOCRView(APIView):
                 image_path
             )
 
-            extracted_text = OCRService.extract_text(full_path)
+            try:
+                extracted_text = OCRService.extract_text(full_path)
+            except Exception:
+                logger.exception("OCR extraction failed for %s", image.name)
+                extracted_text = ""
 
             npk_values = OCRService.extract_npk_values(
                 extracted_text
